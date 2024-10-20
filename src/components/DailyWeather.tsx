@@ -29,6 +29,33 @@ function getWeatherIcon(code: number) {
   return icons.get(arr);
 }
 
+function getWeatherType(code: number) {
+  switch (true) {
+    case [0].includes(code):
+      return 'clear';
+    case [1].includes(code):
+      return 'mainly clear';
+    case [2].includes(code):
+      return 'partly cloudy';
+    case [3].includes(code):
+      return 'overcast';
+    case [45, 48].includes(code):
+      return 'mist';
+    case [51, 56, 61, 66, 80].includes(code):
+      return 'drizzle';
+    case [53, 55, 63, 65, 57, 67, 81, 82].includes(code):
+      return 'rain';
+    case [71, 73, 75, 77, 85, 86].includes(code):
+      return 'snow';
+    case [95].includes(code):
+      return 'thunderstorm';
+    case [96, 99].includes(code):
+      return 'thunderstormRain';
+    default:
+      return 'unknown';
+  }
+}
+
 function formatDay(dateStr: string) {
   return new Intl.DateTimeFormat('en', {
     weekday: 'short',
@@ -56,7 +83,13 @@ class DailyWeather extends React.Component<
     const { max, min, date, code, i } = this.props;
     return (
       <li className='day'>
-        <img className='icon' src={getWeatherIcon(code)} alt='' />
+        <div className='icon-container'>
+          <img
+            className='icon'
+            src={getWeatherIcon(code)}
+            alt={getWeatherType(code)}
+          />
+        </div>
         <p>{i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : formatDay(date)}</p>
         <p>
           {Math.round(min)}&deg; &mdash; <strong>{Math.round(max)}&deg;</strong>

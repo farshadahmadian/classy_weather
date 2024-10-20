@@ -1,7 +1,7 @@
-import React, { ChangeEvent, FormEvent } from 'react';
+import React, { ChangeEvent } from 'react';
 import Weather from './components/Weather';
 
-type AppPropsType = Record<string, never>;
+type EmptyObject = Record<string, never>;
 
 type WeatherType = {
   temperature_2m_max: number[];
@@ -20,8 +20,10 @@ export type AppStateType = {
   weather: WeatherType;
 };
 
-class App extends React.Component<AppPropsType, AppStateType> {
-  constructor(props: AppPropsType) {
+class App extends React.Component<EmptyObject, AppStateType> {
+  controller;
+
+  constructor(props: EmptyObject) {
     super(props);
     this.state = {
       location: '',
@@ -33,6 +35,7 @@ class App extends React.Component<AppPropsType, AppStateType> {
       weather: null,
     };
 
+    this.controller = new AbortController();
     // this.handleChangeInput = this.handleChangeInput.bind(this);
   }
 
@@ -42,12 +45,16 @@ class App extends React.Component<AppPropsType, AppStateType> {
     });
   }
 
-  async fetchWeather(event: FormEvent) {
-    event.preventDefault();
+  async fetchWeather(controller: AbortController) {
+    if (this.state.location.length < 2) {
+      this.setState({ weather: null });
+      return;
+    }
     try {
       this.setState({ isLoading: true });
       const geoRes = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${this.state.location}`
+        `https://geocoding-api.open-meteo.com/v1/search?name=${this.state.location}`,
+        { signal: controller.signal }
       );
       const geoData = await geoRes.json();
       // console.log(geoData);
@@ -80,25 +87,63 @@ class App extends React.Component<AppPropsType, AppStateType> {
     }
   }
 
+  // 1) when the App component is mounted (first render), the state gets updated in componentDidMount(), which causes a re-render
+  componentDidMount(): void {
+    this.setState({ location: localStorage.getItem('location') || '' });
+  }
+
+  // 2) when a re-render happens, componentDidUpdate() gets called and compares the previous value of this.state.location, e.g. "" as the initial value, with the new value
+  componentDidUpdate(
+    _prevProps: Readonly<EmptyObject>,
+    prevState: Readonly<AppStateType>
+  ): void {
+    if (this.state.location !== prevState.location) {
+      this.controller.abort(); // cancel the previous http request
+      this.controller = new AbortController(); // re-assign the controller
+      this.fetchWeather(this.controller); // send the new http request
+      localStorage.setItem('location', this.state.location);
+    }
+  }
+
+  componentWillUnmount(): void {
+    this.controller.abort();
+  }
+
   render() {
     return (
       <div className='app'>
         <h1>Classy Weather</h1>
-        <form onSubmit={this.fetchWeather.bind(this)}>
-          <input
-            type='text'
-            placeholder='Search for location'
-            value={this.state.location}
-            onChange={this.handleChangeInput.bind(this)}
-          />
-          <button style={{ marginTop: '20px' }}>Get Weather</button>
-        </form>
+        <Input
+          location={this.state.location}
+          onChangeInput={this.handleChangeInput.bind(this)}
+        />
         {this.state.isLoading && <p className='loader'>Loading ...</p>}
-
         {!this.state.isLoading && this.state.weather && (
           <Weather weather={this.state.weather} info={this.state.info} />
         )}
       </div>
+    );
+  }
+}
+
+type InputPropsType = {
+  location: string;
+  onChangeInput: (event: ChangeEvent) => void;
+};
+
+class Input extends React.Component<InputPropsType, EmptyObject> {
+  constructor(props: InputPropsType) {
+    super(props);
+  }
+
+  render() {
+    return (
+      <input
+        type='text'
+        placeholder='Search for location'
+        value={this.props.location}
+        onChange={this.props.onChangeInput}
+      />
     );
   }
 }
